@@ -185,6 +185,7 @@ dependencies = [
     { name = "langchain" },
     { name = "langchain-community" },
     { name = "langchain-openai" },
+    { name = "langgraph" },
     { name = "python-dotenv" },
 ]
 
@@ -195,6 +196,7 @@ requires-dist = [
     { name = "langchain", specifier = ">=1.0.3" },
     { name = "langchain-community", specifier = ">=0.4.1" },
     { name = "langchain-openai", specifier = ">=1.0.2" },
+    { name = "langgraph", specifier = ">=1.0.2" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
 ]
 
