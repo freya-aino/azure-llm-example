@@ -18,7 +18,7 @@ DOKUMENT_RAG_TOOL_NAME = "retreive_document_info"
 # @tool("scratchpad")
 # def scratchpad()
 
-@tool(DOKUMENT_RAG_TOOL_NAME)
+@tool(name_or_callable=DOKUMENT_RAG_TOOL_NAME)
 def retreive_documents_tool(search_query: str, top_k: int):
 
     azure_retreiver = AzureAISearchRetriever(
