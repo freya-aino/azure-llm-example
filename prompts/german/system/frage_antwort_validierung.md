@@ -8,7 +8,7 @@ Deine Aufgabe ist wie folgt:
         - Sind alle Fragen beantwortet ? : (ja/nein)
         - Sind alle Fragen logisch konsisten beantwortet ? : (ja/nein)
         - Sind alle Fragen in maximal einem Satz beantwortet worden ? : (ja/nein)
-    - Nach deiner Bewertung füge einen einzigen Carakter ein:
+    - Nach deiner Bewertung schreibe einen einzigen Carakter:
         - Eine '1' wen die Bewertung alle mit ja beantwortet wurden!
-        - eine '2' wen nur eine der Bewertungen mit nein beantwortet wurde!
-    - Schreibe den letzten (output) Charakter ohne Sonderzeichen und füge nichts hinter ihm ein. 
+        - eine '0' wen nur eine der Bewertungen mit nein beantwortet wurde!
+    - Schreibe den letzten (output) Charakter ohne Sonderzeichen und füge keine weiteren charactere ein. 
