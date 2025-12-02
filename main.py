@@ -1,11 +1,8 @@
 from os import environ
 from dotenv import load_dotenv
-from langchain_community.retrievers import AzureAISearchRetriever
 from langchain_openai import AzureChatOpenAI
 
 from langchain import agents #  import AzureChatOpenAI, AzureOpenAI
-from langchain.tools import BaseTool, tool
-
 
 
 USER_FRAGE_ELEMENTE_NOTATION = "<user_frage_element>", "</user_frage_element>"
@@ -18,40 +15,14 @@ DOKUMENT_RAG_TOOL_NAME = "retreive_document_info"
 # @tool("scratchpad")
 # def scratchpad()
 
-@tool(name_or_callable=DOKUMENT_RAG_TOOL_NAME)
-def retreive_documents_tool(search_query: str, top_k: int):
-
-    azure_retreiver = AzureAISearchRetriever(
-        top_k = top_k,
-        api_key=environ["AZURE_AI_SEARCH_API_KEY"],
-        service_name=environ["AZURE_AI_SEARCH_SERVICE_NAME"],
-        index_name=environ["AZURE_AI_SEARCH_INDEX_NAME"],
-        content_key="chunk",
-    )
-
-    retrieved = azure_retreiver.invoke(search_query)
-    retrieved = [r.model_dump() for r in retrieved]
-
-    return [
-        { # TODO: inform downstram agents about this structure
-            "text_ausschnitt": r["chunk"], 
-            "ursprungs_dokument": r["title"]
-        }
-        for r in retrieved
-    ]
-
-
-WOERTERBUCH = [
-    "AUFGABE=Deine Aufgabe, welche dir zugeteilt wird, welche du Auschließlich behandelst und von welcher du unter keinen Umständen abweichst.",
-    "USERFRAGE=Die ursprüngliche Frage des Users welche du nicht direkt erhälst",
-    f"USERFRAGE_ELEMENTE=Die Elemente der User Frage welche für dich Relevant sind und Vorverarbeitet wurden, sie werden mit {USER_FRAGE_ELEMENTE_NOTATION} gekenzeichnet und sind die Wichtigsten Informationen für deine AUFGABE.",
-    "WISSENSDATENBANK=Eine Datenbank welche informationen über alle notwendigen Themen enthällt mit welcher du deine AUFGABE bewältigst.",
-    "DOKUMENT=Ein Dokument das in der WISSENSDATENBANK Enthalten ist, dessen Informationen als 100% Wahr und Genau behandelt werden.",
-    "TEXTSEQUENZ=Ein Text welcher direkt aus einem DOKUMENT stammt, diese Informationen sind mit höchster präferenz für richtigkeit und genaugkeit zu werten!",
-    "QUELLE=Eine Referenz designiert mit Wissenschaftlicher notation ([1], [2], etc.) sowie eine Zuordnung der Referenz zu einer TEXTSEQUENZ und DOKUMENT.",
-    f"FRAGETOOL=Ein Tool namens '{DOKUMENT_RAG_TOOL_NAME}' mit welchem du mittels der parameter 'search_query' und 'top_k' genau 'k' (anzahl) TEXTSEQUENZ aus der WISSENSDATENBANK, anhand der frage in 'search_query', extrahieren kannst.",
-    "TEAM=Wichtige Mitarbeitende welche einzelne speziealisierte Aufgaben erledigen auf wessen informationen du entweder zurückgreifen kannst oder welche du kontolieren musst um Effizient deine spezielle AUFGABE zu erfüllen."
-]
+# FRAGETOOL = Ein Tool mit welchem du mittels der parameter 'search_query' und 'top_k' genau 'k' (anzahl) TEXTSEQUENZ aus der WISSENSDATENBANK, anhand der frage in 'search_query', extrahieren kannst.",
+# USERFRAGE = Eine Frage des USER;
+# USERFRAGE_ELEMENT = Ein Element der User Frage welches für dich Relevant ist und Vorverarbeitet wurden, sie werden gekenzeichnet und sind die Wichtigsten Informationen für deine AUFGABE;
+# WISSENSDATENBANK = Eine Datenbank welche informationen über alle notwendigen Themen enthällt mit welcher du deine AUFGABE bewältigst;
+# DOKUMENT = Ein Dokument das in der WISSENSDATENBANK Enthalten ist, dessen Informationen als 100% Wahr und Genau behandelt werden;
+# TEXTSEQUENZ = Ein Text welcher direkt aus einem DOKUMENT stammt, diese Informationen sind mit höchster präferenz für richtigkeit und genaugkeit zu werten;
+# QUELLE = Eine Referenz designiert mit Wissenschaftlicher notation ([1], [2], etc.) sowie eine Zuordnung der Referenz zu einer TEXTSEQUENZ und DOKUMENT;
+# TEAM=Wichtige Mitarbeitende welche einzelne speziealisierte Aufgaben erledigen auf wessen informationen du entweder zurückgreifen kannst oder welche du kontolieren musst um Effizient deine spezielle AUFGABE zu erfüllen;
 
 GLOBALE_SYSTEMPROMPTS = [
     "Wörter die nur mit großbustaben geschrieben werden beschreiben immer die selbe entität (z.b. eine Datenstruktur, ein bestimmter Text)",

@@ -1,19 +1,17 @@
-from typing_extensions import TypedDict, Union, List
-from langchain.messages import HumanMessage, AIMessage
+# from typing_extensions import TypedDict, Union, List
+# from langchain.messages import HumanMessage, AIMessage
+from typing_extensions import List
 
-def read_text_file(path: str, tag: str) -> str:
+def read_text_file(path: str, tag: str) -> List[str]:
     with open(path, "r") as f:
-        s = f.read()
-        s = f"<{tag}>{s}</{tag}>"
-    return s
+        return [f"<{tag}>{a.strip().replace('\n', '')}</{tag}>" for a in f.readlines()]
 
 def tag_text(text: str, tag) -> str:
     return f"<{tag}>{text}</{tag}>"
 
+class Agent:
+    def __init__(self):
+        pass
 
-class ReceptionConversationState(TypedDict):
-    conversation: List[Union[HumanMessage, AIMessage]]
-    questionnaire: AIMessage
-    answers: AIMessage
-    llm_calls: int
-    answers_complete: bool
+    def compile(self):
+        raise NotImplementedError
