@@ -8,15 +8,15 @@ from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
 import pprint
 
-from agents.reception import ReceptionAgent
-
 def main():
 
     # wir laden alle system variablen für unsere API anbindungen
     load_dotenv()
 
+    # from agents.reception import ReceptionAgent
     # reception_agent = ReceptionAgent(max_llm_calls=10, language="german")
     # agent = reception_agent.compile()
+
 
     # input_ = ReceptionConversationState(
     #     conversation = [],
@@ -35,19 +35,24 @@ def main():
     # print("----- ANTWORTBOGEN -----")
     # pprint.pprint(out["questionnaire"].content)
 
-    llm = AzureChatOpenAI(
-        api_version="2025-01-01-preview",
-        azure_deployment="gpt-4.1",
-        model="gpt-4.1",
-        temperature=0.25,
-        max_completion_tokens=1000,
-        timeout=20,
-        max_retries=1
-    )
-
     df = pl.read_csv("./beispiele.csv")
 
     print(df)
+
+    from agents.knowledge import WissensAgent, WissensAgentState
+    
+    output = WissensAgent().compile().invoke(
+        WissensAgentState(
+            konversation=[],
+            klassifikation=None,
+            llm_calls=0,
+            dokument_elemente_in_kontext=[],
+            gedankengang=None,
+            beispiele=[] # TODO
+        )
+    )
+
+    pprint.pprint(output)
 
     # Step 1 - User Step : Get Answeres to fill Questionair.
     # Step 2 - LLM  Step : Compile Questionair.
