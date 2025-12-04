@@ -16,7 +16,7 @@ class DokumentElement(TypedDict):
     quelle: str
 
 class KonversationKlassifikation(TypedDict):
-    ist_frage: Literal["ja", "nein"]
+    hat_frage: Literal["ja", "nein"]
     frage_typ: Literal["technisch", "offen", "persoenlich"] | None
     frage_praezision: Literal["niedrig", "mittel", "hoch"] | None
     aktuelle_frage: str | None
@@ -36,7 +36,6 @@ class Gedankengang(TypedDict):
 
 class WissensAgentState(TypedDict):
     konversation: List[Union[HumanMessage, AIMessage]]
-
     klassifikation: KonversationKlassifikation | None
     
     llm_calls: int
@@ -50,7 +49,7 @@ class WissensAgentState(TypedDict):
 @tool(name_or_callable="dokument_suche_werkzeug", description="Ein Werkzeug für die dokument-element-suche durch das mit hilfe von `suchanfrage`, `top_k` Dokument")
 def dokument_suche_werkzeug(suchanfrage: str, top_k: int) -> List[DokumentElement]:
 
-    top_k = max(0, min(top_k, 5))
+    top_k = max(0, min(top_k, 10))
 
     azure_dokumentensuche = AzureAISearchRetriever(
         top_k = top_k,
@@ -74,9 +73,11 @@ def dokument_suche_werkzeug(suchanfrage: str, top_k: int) -> List[DokumentElemen
 class WissensAgent:
 
     def __init__(self,
-        max_llm_calls: int = 10
+        max_llm_calls: int = 10,
+        erwuenschte_note: float = 3.0
     ):
         self.max_llm_calls = max_llm_calls
+        self.erwuenschte_note = erwuenschte_note
     
         self.llm = AzureChatOpenAI(
             api_version="2025-01-01-preview",
@@ -107,12 +108,15 @@ class WissensAgent:
         workflow.add_edge(self.konversation_node.__name__, self.user_input_node.__name__)
         
         workflow.add_edge(self.dokument_suche_werkzeug_node.__name__, self.gedanken_node.__name__)
-        workflow.add_edge(self.gedanken_node.__name__, END)
-        # workflow.add_conditional_edges(
-        #     self.gedanken_node.__name__,
-        #     self.ist_gedankengang_zu_ende,
-        #     [self.gedanken_node.__name__, self.user_input_node.__name__, END],
-        # )
+        # workflow.add_edge(self.gedanken_node.__name__, END)
+        workflow.add_conditional_edges(
+            self.gedanken_node.__name__,
+            self.ist_gedankengang_zu_ende,
+            {
+                True: END, 
+                False: self.dokument_suche_werkzeug_node.__name__, 
+            }
+        )
 
         # workflow.add_edge(gedanken_node.__name__, user_input_node.__name__)
         # TODO : vieleicht fuegen wir den bewertungs node und den feedback node nach dem gedanke node, vor den antwort node ?
@@ -123,13 +127,14 @@ class WissensAgent:
 
         print("----------------------------------------------------")
         
-        assert state['llm_calls'] <= self.max_llm_calls, f"LLM wurde {self.max_llm_calls} mal aufgerufen, ende."
-
         if len(state['konversation']) > 0 and state['konversation'][-1].type == "ai":
             print(f"AGENT: {state['konversation'][-1].content}")
 
-        user_input = input("INPUT: ")
-        konversation = [*state["konversation"], HumanMessage(user_input)]
+        if len(state['konversation']) > 0 and state['konversation'][-1].type == "human":
+            konversation = state["konversation"]
+        else:
+            user_input = input("INPUT: ")
+            konversation = [*state["konversation"], HumanMessage(user_input)]
 
         frage_klassifikations_llm = self.llm.with_structured_output(KonversationKlassifikation)
         klassifikation = frage_klassifikations_llm.invoke(f"""
@@ -156,8 +161,8 @@ class WissensAgent:
 
     def konversation_hat_frage(self, state: WissensAgentState):
         assert state["klassifikation"], "die konversation muss klassifiziert worden sein"
-        print(f"[DEBUG] - Konversation hat frage: {state['klassifikation']['ist_frage']}")
-        return state["klassifikation"]["ist_frage"]
+        print(f"[DEBUG] - Konversation hat frage: {state['klassifikation']['hat_frage']}")
+        return state["klassifikation"]["hat_frage"]
 
 
     def konversation_node(self, state: WissensAgentState):
@@ -203,12 +208,12 @@ class WissensAgent:
             Die 'suchanfrage' wird via Vektorsuche an ein LLM gegeben um relevante Dokumentauszuege zu finen, beachte die formatierung die solche LLM-encoder erwarten.
             Diese Dokumentauszuege sind relevant zur beantwortung der USER_FRAGE.
             Benutze hierbei 'top_k' um bei praeziesen Fragen weniger Dokumentauszuege zu kriegen, und bei offeneren Fragen mehr Dokumentauszuege zu kriegen.
-            'top_k' ist auf einer skala von 1 bis 5, wo 1 ein Dokumentauszug ist und 5 fuenf Dokumentauszuege.
+            'top_k' ist auf einer skala von 1 bis 10, wo 1 = ein Dokumentauszug ist und 10 = viele Dokumentenauszuege.
         """)
 
         has_valid_tool_call = len(werkzeug_ausgabe.tool_calls) > 0 and werkzeug_ausgabe.tool_calls[-1]["name"] == 'dokument_suche_werkzeug'
         if has_valid_tool_call:
-            print(f"[DEBUG] - calle tool mit {werkzeug_ausgabe.tool_calls[-1]['args']}")
+            print(f"[DEBUG] - werkzeugaufruf mit {werkzeug_ausgabe.tool_calls[-1]['args']}")
             ergebnisse = dokument_suche_werkzeug.invoke(werkzeug_ausgabe.tool_calls[-1]["args"])
 
             # TODO format ergebnise
@@ -261,17 +266,38 @@ class WissensAgent:
             Verwende in deiner Antwort die quellenangaben aus DOKUMENTENAUSSCHNITTE und QUELLEN die du verwendest mit der notation [QUELLE].
         """)
 
+        string_formatierte_beispiele = '\n'.join([
+            f"""
+                'frage': {beispiel['frage']}
+                'gedanken': {beispiel['gedanken']}
+                'bezug_auf_quellen': {beispiel['bewertung']['bezug_auf_quellen']}
+                'bezug_auf_sachverhalt': {beispiel['bewertung']['bezug_auf_sachverhalt']}
+                'gedankengang_effizienz': {beispiel['bewertung']['gedankengang_effizienz']}
+            """
+            for beispiel in state['beispiele']
+        ])
+
         bewertung = bewertung_llm.invoke(f"""
             Du kriegst:
+            - Eine Liste an Beispielen welche du als Wichtigste referenz siehst.
             - Eine User Frage
             - Ein Gedankengang in welchem die rueckfuehrung der Logik die die Frage beantworten soll beschrieben ist.
             - eine liste an Dokumentausschnitten und quellen.
             - Die Antwort auf die User Frage
-                        
+
+            ---
+            BEISPIElE:
+                                         
+            {string_formatierte_beispiele}
+            
+            ---
+
             USER_FRAGE: {user_frage}
             DOKUEMNTEAUSSCHNITTE und QUELLEN: {state['dokument_elemente_in_kontext']}
             GEDANKENGANG: {gedanken.content} 
             ANTWORT: {antwort.content}
+
+            ---
 
             Bewerte den Gedankengang anhand des Deutschen Schulnoten Systems fuer die Faktoren.
             "1" bedeutet sehr gut und "6" bedeutet sehr schlecht, alles dazwischen ist eine jehweilige Einstufung der Bewertung.
@@ -279,9 +305,12 @@ class WissensAgent:
             - bezug_auf_quellen: wie gut bezieht sich der gedankengang auf die vorhandenen quellen, und werden diese sinnvoll genutzt um eine logik zu erklaeren.
             - bezug_auf_sachverhalt: wie gut wird sich auf den sachverhalt der frage bezogen waehrend des gedankengangs.
             - gedankengang_effizienz - wie effizient die gedanken verwendet werden, ob sachen ausgefuehrt werden die irrelevant sind und wie schnell sich auf eine konkrete logik bezogen wird.
-            und fuege eine korrektur hinzu in welcher du die moeglichen aenderungen beschreibst die im GEDANKENGANG gemacht werden koennten um eine bessere Note zu erziehlen.
+            Fuege eine korrektur hinzu in welcher du darauf hinweist wieso du gute oder schlechte noten verteilt hast, diese sollen so formuliert werden das der GEDANKENGANG genau weis was die fehler / probleme waren.
+            Bewerte den GEDANKENGANG anhand der BEISPIELE, diese Beispiele haben eine Perfekte Notenvergabe welche du emulieren solltest. 
         """)
-            
+
+        print(f"[DEBUG] - bewertung: {bewertung}")
+
         return {
             "konversation": [*state["konversation"], antwort],
             "llm_calls": state["llm_calls"] + 1,
@@ -294,5 +323,23 @@ class WissensAgent:
         }
     
     def ist_gedankengang_zu_ende(self, state: WissensAgentState):
-        return END # else return korrektur_node.__name__
+                
+        assert state['gedankengang'], "gedankengang sollte gesetzt sein an diesem punkt"
+
+        note = sum([
+            int(state['gedankengang']['bewertung']["bezug_auf_quellen"]),
+            int(state['gedankengang']['bewertung']["bezug_auf_sachverhalt"]),
+            int(state['gedankengang']['bewertung']['gedankengang_effizienz'])
+        ]) / 3
+
+        print(f"[DEBUG] - note ereicht: {note}")
+
+        if note <= self.erwuenschte_note:
+            return True
+
+        if state['llm_calls'] >= self.max_llm_calls:
+            print("[DEBUG] - maximale anzahl an llm calls ereicht")
+            return True
+        
+        return False
         

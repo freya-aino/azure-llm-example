@@ -1,11 +1,5 @@
 import polars as pl
-import json
-from langchain_openai import AzureChatOpenAI
-from langgraph.graph import StateGraph, START, END
-from langchain.messages import SystemMessage, HumanMessage, AIMessage
-
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage
 import pprint
 
 def main():
@@ -35,37 +29,51 @@ def main():
     # print("----- ANTWORTBOGEN -----")
     # pprint.pprint(out["questionnaire"].content)
 
-    df = pl.read_csv("./beispiele.csv")
 
-    print(df)
+    from agents.knowledge import WissensAgent, WissensAgentState, Gedankengang, GedankengangBewertung
 
-    from agents.knowledge import WissensAgent, WissensAgentState
+    df = pl.read_excel("./beispiele.xlsx")
+    beispiele = [
+        {
+            "frage": r['orginal_frage'],
+            "gedanken": r['gedanken'],
+            "antwort": r['antwort'],
+            "bewertung": {
+                "bezug_auf_quellen": str(r['bewertung_bezug_auf_quellen']),
+                "bezug_auf_sachverhalt": str(r['bewertung_bezug_auf_sachverhalt']),
+                "gedankengang_effizienz": str(r['bewertung_gedankengang_effizienz']),
+            }
+        }
+        for r in df.iter_rows(named=True)
+    ]
     
-    output = WissensAgent().compile().invoke(
+    outputs = []
+    
+    
+    agent = WissensAgent(
+        max_llm_calls = 3,
+        erwuenschte_note = 2.4
+    ).compile()
+
+    
+    print(agent.get_graph().draw_mermaid())
+    exit()
+
+
+    o = agent.invoke(
         WissensAgentState(
             konversation=[],
             klassifikation=None,
             llm_calls=0,
             dokument_elemente_in_kontext=[],
             gedankengang=None,
-            beispiele=[] # TODO
+            beispiele=beispiele
         )
     )
 
-    pprint.pprint(output)
+    print(f"[FINALE ANTWORT]: {o['gedankengang']['antwort'].content}")
 
-    # Step 1 - User Step : Get Answeres to fill Questionair.
-    # Step 2 - LLM  Step : Compile Questionair.
-    # Step 3 - 
-
-    # Agent 1 - Konversationsagent
-    # Agent 2 - Wissensagent
-    # Agent 3 - Bewertungsagent
-
-    # [anhand Menschlicher Beispiele]
-    # [Bewertung des reasoning einmal definieren]
-    # [syntetische Reasoining generierung mit: beispiels-fragen (8) -> Wissensagent (hoere temperatur, etc.) -> 5 reasonings pro Beipiel (40)]
-
+    
 
 if __name__ == "__main__":
     main()

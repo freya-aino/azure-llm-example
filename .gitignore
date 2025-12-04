@@ -2,4 +2,6 @@
 .env
 .idea
 __pycache__
-beispiele.csv
+beispiele.xlsx
+example-processing.ipynb
+.ipynb_checkpoints
