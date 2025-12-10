@@ -56,8 +56,8 @@ def main():
     ).compile()
 
     
-    print(agent.get_graph().draw_mermaid())
-    exit()
+    # print(agent.get_graph().draw_mermaid())
+    # exit()
 
 
     o = agent.invoke(
